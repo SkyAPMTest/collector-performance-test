@@ -20,6 +20,8 @@ package org.apache.skywalking.apm.collector.performance;
 
 import com.google.protobuf.ByteString;
 import io.grpc.stub.StreamObserver;
+import java.util.Random;
+import org.apache.skywalking.apm.collector.performance.register.ApplicationsStorage;
 import org.apache.skywalking.apm.network.proto.*;
 import org.apache.skywalking.apm.network.trace.component.ComponentsDefine;
 
@@ -28,27 +30,35 @@ import org.apache.skywalking.apm.network.trace.component.ComponentsDefine;
  */
 class ConsumerMock {
 
+    private Random random = new Random();
+
     void mock(StreamObserver<UpstreamSegment> segmentStreamObserver, UniqueId.Builder globalTraceId,
-        UniqueId.Builder segmentId, long startTimestamp, boolean isPrepare) {
+        UniqueId.Builder segmentId, long startTimestamp, boolean isPrepare, ApplicationsStorage.Application application,
+        int serviceIndex) {
         UpstreamSegment.Builder upstreamSegment = UpstreamSegment.newBuilder();
         upstreamSegment.addGlobalTraceIds(globalTraceId);
-        upstreamSegment.setSegment(createSegment(startTimestamp, segmentId, isPrepare));
+        upstreamSegment.setSegment(createSegment(startTimestamp, segmentId, isPrepare, application, serviceIndex));
 
         segmentStreamObserver.onNext(upstreamSegment.build());
     }
 
-    private ByteString createSegment(long startTimestamp, UniqueId.Builder segmentId, boolean isPrepare) {
+    private ByteString createSegment(long startTimestamp, UniqueId.Builder segmentId, boolean isPrepare,
+        ApplicationsStorage.Application application,
+        int serviceIndex) {
         TraceSegmentObject.Builder segment = TraceSegmentObject.newBuilder();
         segment.setTraceSegmentId(segmentId);
-        segment.setApplicationId(-1);
-        segment.setApplicationInstanceId(2);
-        segment.addSpans(createExitSpan(startTimestamp, isPrepare));
-        segment.addSpans(createEntrySpan(startTimestamp, isPrepare));
+        segment.setApplicationId(application.getApplicationId());
+
+        int index = random.nextInt(PerformanceTestBoot.INSTANCE_SIZE);
+        segment.setApplicationInstanceId(application.getInstances()[index].getInstanceId());
+        segment.addSpans(createExitSpan(startTimestamp, isPrepare, application, serviceIndex));
+        segment.addSpans(createEntrySpan(startTimestamp, isPrepare, application, serviceIndex));
 
         return segment.build().toByteString();
     }
 
-    private SpanObject.Builder createExitSpan(long startTimestamp, boolean isPrepare) {
+    private SpanObject.Builder createExitSpan(long startTimestamp, boolean isPrepare,
+        ApplicationsStorage.Application application, int serviceIndex) {
         SpanObject.Builder span = SpanObject.newBuilder();
         span.setSpanId(1);
         span.setSpanType(SpanType.Exit);
@@ -61,14 +71,16 @@ class ConsumerMock {
             span.setPeer("172.25.0.4:20880");
             span.setOperationName("org.skywaking.apm.testcase.dubbo.services.GreetService.doBusiness()");
         } else {
-            span.setOperationNameId(-1);
+            int serviceId = application.getExitServiceNames()[serviceIndex].getServiceId();
+            span.setOperationNameId(serviceId);
             span.setPeerId(-1);
         }
         span.setIsError(false);
         return span;
     }
 
-    private SpanObject.Builder createEntrySpan(long startTimestamp, boolean isPrepare) {
+    private SpanObject.Builder createEntrySpan(long startTimestamp, boolean isPrepare,
+        ApplicationsStorage.Application application, int serviceIndex) {
         SpanObject.Builder span = SpanObject.newBuilder();
         span.setSpanId(0);
         span.setSpanType(SpanType.Entry);
@@ -80,7 +92,8 @@ class ConsumerMock {
         if (isPrepare) {
             span.setOperationName("/dubbox-case/case/dubbox-rest");
         } else {
-            span.setOperationNameId(2);
+            int serviceId = application.getEntryServiceNames()[serviceIndex].getServiceId();
+            span.setOperationNameId(serviceId);
         }
         span.setIsError(false);
         return span;

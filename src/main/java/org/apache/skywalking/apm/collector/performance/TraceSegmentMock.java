@@ -21,6 +21,7 @@ package org.apache.skywalking.apm.collector.performance;
 import io.grpc.*;
 import io.grpc.stub.StreamObserver;
 import java.util.concurrent.atomic.AtomicLong;
+import org.apache.skywalking.apm.collector.performance.register.ApplicationsStorage;
 import org.apache.skywalking.apm.network.proto.*;
 import org.slf4j.*;
 
@@ -32,20 +33,14 @@ class TraceSegmentMock {
     private static final Logger logger = LoggerFactory.getLogger(TraceSegmentMock.class);
 
     private final CompleteListener listener = new CompleteListener();
+    private final ApplicationsStorage.Application[] providerApplications;
+    private final ApplicationsStorage.Application[] consumerApplications;
 
-    void singleMock(ManagedChannel channel, Long timestamp) {
-        UniqueId.Builder globalTraceId = UniqueIdBuilder.INSTANCE.create();
-
-        TraceSegmentServiceGrpc.TraceSegmentServiceStub stub = TraceSegmentServiceGrpc.newStub(channel);
-        StreamObserver<UpstreamSegment> streamObserver = createStreamObserver(9999, stub);
-
-        ConsumerMock consumerMock = new ConsumerMock();
-        UniqueId.Builder consumerSegmentId = UniqueIdBuilder.INSTANCE.create();
-        consumerMock.mock(streamObserver, globalTraceId, consumerSegmentId, timestamp, true);
-
-        ProviderMock providerMock = new ProviderMock();
-        UniqueId.Builder providerSegmentId = UniqueIdBuilder.INSTANCE.create();
-        providerMock.mock(streamObserver, globalTraceId, providerSegmentId, consumerSegmentId, timestamp, true);
+    TraceSegmentMock(
+        ApplicationsStorage.Application[] providerApplications,
+        ApplicationsStorage.Application[] consumerApplications) {
+        this.providerApplications = providerApplications;
+        this.consumerApplications = consumerApplications;
     }
 
     void batchMock(int threadNum, AtomicLong segmentCounter, long startTime) {
@@ -66,15 +61,18 @@ class TraceSegmentMock {
                     logger.info("segment count: {}, tps: {}", counter, tps);
                 }
 
+                int appIndex = (int)counter % PerformanceTestBoot.APPLICATION_SIZE;
+                int serviceIndex = (int)counter % PerformanceTestBoot.SERVICE_SIZE;
+
                 UniqueId.Builder globalTraceId = UniqueIdBuilder.INSTANCE.create();
 
                 ConsumerMock consumerMock = new ConsumerMock();
                 UniqueId.Builder consumerSegmentId = UniqueIdBuilder.INSTANCE.create();
-                consumerMock.mock(streamObserver, globalTraceId, consumerSegmentId, startTimestamp, false);
+                consumerMock.mock(streamObserver, globalTraceId, consumerSegmentId, startTimestamp, false, consumerApplications[appIndex], serviceIndex);
 
                 ProviderMock providerMock = new ProviderMock();
                 UniqueId.Builder providerSegmentId = UniqueIdBuilder.INSTANCE.create();
-                providerMock.mock(streamObserver, globalTraceId, providerSegmentId, consumerSegmentId, startTimestamp, false);
+                providerMock.mock(streamObserver, globalTraceId, providerSegmentId, consumerSegmentId, startTimestamp, false, providerApplications[appIndex], serviceIndex, consumerApplications[appIndex]);
             }
             streamObserver.onCompleted();
 
