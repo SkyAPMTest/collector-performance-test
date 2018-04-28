@@ -15,12 +15,12 @@ public class PerformanceTestBoot {
 
     private static final Logger logger = LoggerFactory.getLogger(PerformanceTestBoot.class);
 
-    public static final int APPLICATION_SIZE = 25;
-    public static final int INSTANCE_SIZE = 10;
-    public static final int SERVICE_SIZE = 1000;
+    static final int APPLICATION_SIZE = 25;
+    static final int INSTANCE_SIZE = 10;
+    static final int SERVICE_SIZE = 1000;
 
     public static void main(String[] args) throws ClientException {
-        ElasticSearchClient client = new ElasticSearchClient("CollectorDBCluster", true, "localhost:9300");
+        ElasticSearchClient client = new ElasticSearchClient("CollectorDBCluster", true, "10.124.151.1:9300");
         client.initialize();
 
         ManagedChannel channel = ManagedChannelBuilder.forAddress("localhost", 11800).usePlaintext(true).build();
@@ -55,6 +55,13 @@ public class PerformanceTestBoot {
         serviceNameRegister.warmUp(consumerApplications);
         logger.info("consumer service name warm up finish");
 
+        NetworkRegister networkRegister = new NetworkRegister(channel, client);
+        networkRegister.register();
+        logger.info("network address register finish");
+
+        networkRegister.warmUp();
+        logger.info("network address warm up finish");
+
         for (ApplicationsStorage.Application consumerApplication : consumerApplications) {
             logger.info("application id: {}, application code: {}", consumerApplication.getApplicationId(), consumerApplication.getApplicationCode());
             for (ApplicationsStorage.Instance instance : consumerApplication.getInstances()) {
@@ -64,7 +71,7 @@ public class PerformanceTestBoot {
 
         AtomicLong segmentCounter = new AtomicLong(0);
         long startTime = System.currentTimeMillis();
-        for (int i = 0; i < 1; i++) {
+        for (int i = 0; i < 10; i++) {
             new Thread(new TraceSegmentMockRunnable(segmentCounter, providerApplications, consumerApplications, startTime, i)).start();
         }
     }

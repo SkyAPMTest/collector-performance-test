@@ -87,7 +87,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>org.apache.skywalking.apm.collector.AgentDataMock</mainClass>
+                            <mainClass>org.apache.skywalking.apm.collector.performance.PerformanceTestBoot</mainClass>
                         </manifest>
                     </archive>
                     <descriptorRefs>

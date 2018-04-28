@@ -55,7 +55,7 @@ class TraceSegmentMock {
             long startTimestamp = System.currentTimeMillis() + cycle * 1000;
             for (int i = 0; i <= 1000; i++) {
                 long counter = segmentCounter.incrementAndGet();
-                if (counter % 40000 == 0) {
+                if (counter % 10000 == 0) {
                     long duration = System.currentTimeMillis() - startTime;
                     long tps = counter / ((duration < 1000 ? 1000 : duration) / 1000);
                     logger.info("segment count: {}, tps: {}", counter, tps);
@@ -63,16 +63,17 @@ class TraceSegmentMock {
 
                 int appIndex = (int)counter % PerformanceTestBoot.APPLICATION_SIZE;
                 int serviceIndex = (int)counter % PerformanceTestBoot.SERVICE_SIZE;
+                int instanceIndex = (int)counter % PerformanceTestBoot.INSTANCE_SIZE;
 
                 UniqueId.Builder globalTraceId = UniqueIdBuilder.INSTANCE.create();
 
                 ConsumerMock consumerMock = new ConsumerMock();
                 UniqueId.Builder consumerSegmentId = UniqueIdBuilder.INSTANCE.create();
-                consumerMock.mock(streamObserver, globalTraceId, consumerSegmentId, startTimestamp, false, consumerApplications[appIndex], serviceIndex);
+                consumerMock.mock(streamObserver, globalTraceId, consumerSegmentId, startTimestamp, false, consumerApplications[appIndex], serviceIndex, instanceIndex);
 
                 ProviderMock providerMock = new ProviderMock();
                 UniqueId.Builder providerSegmentId = UniqueIdBuilder.INSTANCE.create();
-                providerMock.mock(streamObserver, globalTraceId, providerSegmentId, consumerSegmentId, startTimestamp, false, providerApplications[appIndex], serviceIndex, consumerApplications[appIndex]);
+                providerMock.mock(streamObserver, globalTraceId, providerSegmentId, consumerSegmentId, startTimestamp, false, providerApplications[appIndex], serviceIndex, consumerApplications[appIndex], instanceIndex);
             }
             streamObserver.onCompleted();
 
