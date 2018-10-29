@@ -16,64 +16,74 @@
  *
  */
 
-package org.apache.skywalking.apm.collector.performance;
+package org.apache.skywalking.apm.collector.performance.mock;
 
 import com.google.protobuf.ByteString;
 import io.grpc.stub.StreamObserver;
-import org.apache.skywalking.apm.collector.performance.register.*;
+import org.apache.skywalking.apm.collector.performance.register.RegisterInventoryStorage;
 import org.apache.skywalking.apm.network.proto.*;
 import org.apache.skywalking.apm.network.trace.component.ComponentsDefine;
 
 /**
  * @author peng-yongsheng
  */
-class ConsumerMock {
+public class ServiceAMock {
 
-    void mock(StreamObserver<UpstreamSegment> segmentStreamObserver, UniqueId.Builder globalTraceId,
-        UniqueId.Builder segmentId, long startTimestamp, boolean isPrepare, ApplicationsStorage.Application application,
-        int serviceIndex, int instanceIndex) {
+    public void mock(StreamObserver<UpstreamSegment> segmentStreamObserver, UniqueId.Builder traceId,
+        UniqueId.Builder segmentId, long startTimestamp, RegisterInventoryStorage.Service serviceAService,
+        RegisterInventoryStorage.Service serviceBService, int instanceIndex, int endpointIndex) {
         UpstreamSegment.Builder upstreamSegment = UpstreamSegment.newBuilder();
-        upstreamSegment.addGlobalTraceIds(globalTraceId);
-        upstreamSegment.setSegment(createSegment(startTimestamp, segmentId, isPrepare, application, serviceIndex, instanceIndex));
+        upstreamSegment.addGlobalTraceIds(traceId);
+        upstreamSegment.setSegment(createSegment(startTimestamp, segmentId, serviceAService, serviceBService, instanceIndex, endpointIndex));
 
         segmentStreamObserver.onNext(upstreamSegment.build());
     }
 
-    private ByteString createSegment(long startTimestamp, UniqueId.Builder segmentId, boolean isPrepare,
-        ApplicationsStorage.Application application,
-        int serviceIndex, int instanceIndex) {
+    private ByteString createSegment(long startTimestamp, UniqueId.Builder segmentId,
+        RegisterInventoryStorage.Service serviceAService,
+        RegisterInventoryStorage.Service serviceBService, int instanceIndex, int endpointIndex) {
         TraceSegmentObject.Builder segment = TraceSegmentObject.newBuilder();
         segment.setTraceSegmentId(segmentId);
-        segment.setApplicationId(application.getApplicationId());
+        segment.setApplicationId(serviceAService.getId());
 
-        segment.setApplicationInstanceId(application.getInstances()[instanceIndex].getInstanceId());
-        segment.addSpans(createEntrySpan(startTimestamp, isPrepare, application, serviceIndex));
+        segment.setApplicationInstanceId(serviceAService.getServiceInstances()[instanceIndex].getId());
+        segment.addSpans(createEntrySpan(startTimestamp, serviceAService, endpointIndex));
 
         for (int i = 1; i <= 20; i++) {
-            segment.addSpans(createExitSpan(i, startTimestamp, isPrepare, application, serviceIndex));
+            segment.addSpans(createExitSpan(i, startTimestamp, serviceAService, serviceBService, instanceIndex, endpointIndex));
         }
 
         return segment.build().toByteString();
     }
 
-    private SpanObject.Builder createExitSpan(int spanId, long startTimestamp, boolean isPrepare,
-        ApplicationsStorage.Application application, int serviceIndex) {
+    private SpanObject.Builder createEntrySpan(long startTimestamp, RegisterInventoryStorage.Service serviceAService,
+        int endpointIndex) {
+        SpanObject.Builder span = SpanObject.newBuilder();
+        span.setSpanId(0);
+        span.setSpanType(SpanType.Entry);
+        span.setSpanLayer(SpanLayer.Http);
+        span.setParentSpanId(-1);
+        span.setStartTime(startTimestamp);
+        span.setEndTime(startTimestamp + 1990);
+        span.setComponentId(ComponentsDefine.TOMCAT.getId());
+        span.setOperationNameId(serviceAService.getEntryEndpoints()[endpointIndex].getId());
+        span.setIsError(false);
+        return span;
+    }
+
+    private SpanObject.Builder createExitSpan(int spanId, long startTimestamp,
+        RegisterInventoryStorage.Service serviceAService,
+        RegisterInventoryStorage.Service serviceBService, int instanceIndex, int endpointIndex) {
         SpanObject.Builder span = SpanObject.newBuilder();
         span.setSpanId(spanId);
         span.setSpanType(SpanType.Exit);
         span.setSpanLayer(SpanLayer.RPCFramework);
         span.setParentSpanId(spanId - 1);
         span.setStartTime(startTimestamp + 10);
-        span.setEndTime(startTimestamp + 1700);
+        span.setEndTime(startTimestamp + 1800);
         span.setComponentId(ComponentsDefine.DUBBO.getId());
-        if (isPrepare) {
-            span.setPeer("172.25.0.4:20880");
-            span.setOperationName("org.skywaking.apm.testcase.dubbo.services.GreetService.doBusiness()");
-        } else {
-            int serviceId = application.getExitServiceNames()[serviceIndex].getServiceId();
-            span.setOperationNameId(serviceId);
-            span.setPeerId(NetworkRegister.CONSUMER_NETWORK_ID);
-        }
+        span.setOperationNameId(serviceAService.getExitEndpoints()[endpointIndex].getId());
+        span.setPeerId(serviceBService.getServiceInstances()[instanceIndex].getNetworkAddressId());
 
         if (spanId > 14) {
             KeyWithStringValue.Builder value1 = KeyWithStringValue.newBuilder();
@@ -88,26 +98,6 @@ class ConsumerMock {
             logMessage.addData(value1);
             logMessage.addData(value2);
             span.addLogs(logMessage.build());
-        }
-        span.setIsError(false);
-        return span;
-    }
-
-    private SpanObject.Builder createEntrySpan(long startTimestamp, boolean isPrepare,
-        ApplicationsStorage.Application application, int serviceIndex) {
-        SpanObject.Builder span = SpanObject.newBuilder();
-        span.setSpanId(0);
-        span.setSpanType(SpanType.Entry);
-        span.setSpanLayer(SpanLayer.Http);
-        span.setParentSpanId(-1);
-        span.setStartTime(startTimestamp);
-        span.setEndTime(startTimestamp + 1990);
-        span.setComponentId(ComponentsDefine.TOMCAT.getId());
-        if (isPrepare) {
-            span.setOperationName("/dubbox-case/case/dubbox-rest");
-        } else {
-            int serviceId = application.getEntryServiceNames()[serviceIndex].getServiceId();
-            span.setOperationNameId(serviceId);
         }
         span.setIsError(false);
         return span;

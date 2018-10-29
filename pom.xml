@@ -57,14 +57,20 @@
             <version>5.0.0-alpha</version>
         </dependency>
         <dependency>
-            <groupId>org.apache.skywalking</groupId>
-            <artifactId>collector-storage-es-provider</artifactId>
-            <version>5.0.0-alpha</version>
-        </dependency>
-        <dependency>
             <groupId>joda-time</groupId>
             <artifactId>joda-time</artifactId>
             <version>${joda-time.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.elasticsearch.client</groupId>
+            <artifactId>elasticsearch-rest-high-level-client</artifactId>
+            <version>6.3.2</version>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>1.18.0</version>
+            <scope>provided</scope>
         </dependency>
     </dependencies>
 
@@ -87,7 +93,7 @@
                 <configuration>
                     <archive>
                         <manifest>
-                            <mainClass>org.apache.skywalking.apm.collector.performance.PerformanceTestBoot</mainClass>
+                            <mainClass>org.apache.skywalking.apm.collector.performance.PerformanceBoot</mainClass>
                         </manifest>
                     </archive>
                     <descriptorRefs>

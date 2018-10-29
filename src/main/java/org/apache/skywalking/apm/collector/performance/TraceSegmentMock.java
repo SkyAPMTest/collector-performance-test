@@ -21,7 +21,8 @@ package org.apache.skywalking.apm.collector.performance;
 import io.grpc.*;
 import io.grpc.stub.StreamObserver;
 import java.util.concurrent.atomic.AtomicLong;
-import org.apache.skywalking.apm.collector.performance.register.ApplicationsStorage;
+import org.apache.skywalking.apm.collector.performance.mock.*;
+import org.apache.skywalking.apm.collector.performance.register.RegisterInventoryStorage;
 import org.apache.skywalking.apm.network.proto.*;
 import org.slf4j.*;
 
@@ -32,23 +33,37 @@ class TraceSegmentMock {
 
     private static final Logger logger = LoggerFactory.getLogger(TraceSegmentMock.class);
 
-    private final CompleteListener listener = new CompleteListener();
-    private final ApplicationsStorage.Application[] providerApplications;
-    private final ApplicationsStorage.Application[] consumerApplications;
+    private final CompleteListener listener_1 = new CompleteListener();
+    private final CompleteListener listener_2 = new CompleteListener();
+    private final Config config;
+    private final RegisterInventoryStorage.Service[] serviceAServices;
+    private final RegisterInventoryStorage.Service[] serviceBServices;
+    private final RegisterInventoryStorage.Service[] serviceCServices;
 
-    TraceSegmentMock(
-        ApplicationsStorage.Application[] providerApplications,
-        ApplicationsStorage.Application[] consumerApplications) {
-        this.providerApplications = providerApplications;
-        this.consumerApplications = consumerApplications;
+    private static final String COLLECTOR_1_ADDR = "localhost";
+    //    private static final String COLLECTOR_1_ADDR = "192.168.3.111";
+    private static final String COLLECTOR_2_ADDR = "localhost";
+//    private static final String COLLECTOR_2_ADDR = "192.168.3.112";
+
+    TraceSegmentMock(Config config,
+        RegisterInventoryStorage.Service[] serviceAServices,
+        RegisterInventoryStorage.Service[] serviceBServices,
+        RegisterInventoryStorage.Service[] serviceCServices) {
+        this.config = config;
+        this.serviceAServices = serviceAServices;
+        this.serviceBServices = serviceBServices;
+        this.serviceCServices = serviceCServices;
     }
 
     void batchMock(int threadNum, AtomicLong segmentCounter, long startTime) {
         logger.info("thread {} start", threadNum);
-        ManagedChannel channel = ManagedChannelBuilder.forAddress("localhost", 11800).usePlaintext(true).build();
-        TraceSegmentServiceGrpc.TraceSegmentServiceStub stub = TraceSegmentServiceGrpc.newStub(channel);
+        ManagedChannel channel_1 = ManagedChannelBuilder.forAddress(COLLECTOR_1_ADDR, 11800).usePlaintext(true).build();
+        ManagedChannel channel_2 = ManagedChannelBuilder.forAddress(COLLECTOR_2_ADDR, 11800).usePlaintext(true).build();
+        TraceSegmentServiceGrpc.TraceSegmentServiceStub stub_1 = TraceSegmentServiceGrpc.newStub(channel_1);
+        TraceSegmentServiceGrpc.TraceSegmentServiceStub stub_2 = TraceSegmentServiceGrpc.newStub(channel_2);
 
-        StreamObserver<UpstreamSegment> streamObserver = createStreamObserver(threadNum, stub);
+        StreamObserver<UpstreamSegment> streamObserver_1 = createStreamObserver(threadNum, stub_1, listener_1);
+        StreamObserver<UpstreamSegment> streamObserver_2 = createStreamObserver(threadNum, stub_2, listener_2);
 
         int cycle = 0;
         while (true) {
@@ -61,23 +76,27 @@ class TraceSegmentMock {
                     logger.info("segment count: {}, tps: {}", counter, tps);
                 }
 
-                int appIndex = (int)counter % PerformanceTestBoot.APPLICATION_SIZE;
-                int serviceIndex = (int)counter % PerformanceTestBoot.SERVICE_SIZE;
-                int instanceIndex = (int)counter % PerformanceTestBoot.INSTANCE_SIZE;
+                int instanceIndex = (int)counter % config.getServiceInstanceNumber();
+                int endpointIndex = (int)counter % config.getEndpointNumber();
 
-                UniqueId.Builder globalTraceId = UniqueIdBuilder.INSTANCE.create();
+                UniqueId.Builder traceId = UniqueIdBuilder.INSTANCE.create();
 
-                ConsumerMock consumerMock = new ConsumerMock();
-                UniqueId.Builder consumerSegmentId = UniqueIdBuilder.INSTANCE.create();
-                consumerMock.mock(streamObserver, globalTraceId, consumerSegmentId, startTimestamp, false, consumerApplications[appIndex], serviceIndex, instanceIndex);
+                ServiceAMock serviceAMock = new ServiceAMock();
+                UniqueId.Builder serviceASegmentId = UniqueIdBuilder.INSTANCE.create();
+                serviceAMock.mock(streamObserver_1, traceId, serviceASegmentId, startTimestamp, serviceAServices[0], serviceBServices[0], instanceIndex, endpointIndex);
 
-                ProviderMock providerMock = new ProviderMock();
-                UniqueId.Builder providerSegmentId = UniqueIdBuilder.INSTANCE.create();
-                providerMock.mock(streamObserver, globalTraceId, providerSegmentId, consumerSegmentId, startTimestamp, false, providerApplications[appIndex], serviceIndex, consumerApplications[appIndex], instanceIndex);
+                ServiceBMock serviceBMock = new ServiceBMock();
+                UniqueId.Builder serviceBSegmentId = UniqueIdBuilder.INSTANCE.create();
+                serviceBMock.mock(streamObserver_2, traceId, serviceBSegmentId, serviceASegmentId, startTimestamp, serviceAServices[0], serviceBServices[0], serviceCServices[0], instanceIndex, endpointIndex);
+
+                ServiceCMock serviceCMock = new ServiceCMock();
+                UniqueId.Builder serviceCSegmentId = UniqueIdBuilder.INSTANCE.create();
+                serviceCMock.mock(streamObserver_1, traceId, serviceCSegmentId, serviceBSegmentId, startTimestamp, serviceAServices[0], serviceBServices[0], serviceCServices[0], instanceIndex, endpointIndex);
             }
-            streamObserver.onCompleted();
+            streamObserver_1.onCompleted();
+            streamObserver_2.onCompleted();
 
-            while (!listener.isComplete()) {
+            while (!listener_1.isComplete() || !listener_2.isComplete()) {
                 try {
                     Thread.sleep(10);
                 } catch (InterruptedException e) {
@@ -85,14 +104,16 @@ class TraceSegmentMock {
                 }
             }
 
-            streamObserver = createStreamObserver(threadNum, stub);
-            listener.reset();
+            streamObserver_1 = createStreamObserver(threadNum, stub_1, listener_1);
+            streamObserver_2 = createStreamObserver(threadNum, stub_2, listener_2);
+            listener_1.reset();
+            listener_2.reset();
             cycle++;
         }
     }
 
     private StreamObserver<UpstreamSegment> createStreamObserver(int threadNum,
-        TraceSegmentServiceGrpc.TraceSegmentServiceStub stub) {
+        TraceSegmentServiceGrpc.TraceSegmentServiceStub stub, CompleteListener listener) {
         return stub.collect(new StreamObserver<Downstream>() {
             @Override public void onNext(Downstream downstream) {
             }
