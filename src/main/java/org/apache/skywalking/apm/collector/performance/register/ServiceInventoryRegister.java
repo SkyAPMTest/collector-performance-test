@@ -2,7 +2,7 @@ package org.apache.skywalking.apm.collector.performance.register;
 
 import io.grpc.ManagedChannel;
 import java.util.concurrent.TimeUnit;
-import org.apache.skywalking.apm.collector.performance.Const;
+import org.apache.skywalking.apm.collector.performance.*;
 import org.apache.skywalking.apm.network.proto.*;
 import org.slf4j.*;
 
@@ -16,7 +16,7 @@ public class ServiceInventoryRegister {
     private final ApplicationRegisterServiceGrpc.ApplicationRegisterServiceBlockingStub applicationRegisterServiceBlockingStub;
 
     public ServiceInventoryRegister(ManagedChannel channel) {
-        this.applicationRegisterServiceBlockingStub = ApplicationRegisterServiceGrpc.newBlockingStub(channel);
+        this.applicationRegisterServiceBlockingStub = PerformanceBoot.attachHeaders(ApplicationRegisterServiceGrpc.newBlockingStub(channel));
     }
 
     public RegisterInventoryStorage.Service[] register(String serviceName, int serviceNumber,

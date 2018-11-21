@@ -1,7 +1,7 @@
 package org.apache.skywalking.apm.collector.performance;
 
 import io.grpc.*;
-import io.grpc.stub.StreamObserver;
+import io.grpc.stub.*;
 import java.io.IOException;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
@@ -77,7 +77,7 @@ public class PerformanceBoot {
         TimeUnit.SECONDS.sleep(5);
 
         TraceSegmentServiceGrpc.TraceSegmentServiceStub stub = TraceSegmentServiceGrpc.newStub(channel);
-        StreamObserver<UpstreamSegment> segmentStreamObserver = stub.collect(new StreamObserver<Downstream>() {
+        StreamObserver<UpstreamSegment> segmentStreamObserver = PerformanceBoot.attachHeaders(stub).collect(new StreamObserver<Downstream>() {
             @Override public void onNext(Downstream downstream) {
             }
 
@@ -145,5 +145,11 @@ public class PerformanceBoot {
             TraceSegmentMock newSegmentMock = new TraceSegmentMock(config, serviceAServices, serviceBServices, serviceCServices);
             newSegmentMock.batchMock(num, segmentCounter, startTime);
         }
+    }
+
+    public static <T extends AbstractStub<T>> T attachHeaders(T stub) {
+        Metadata authHeader = new Metadata();
+        authHeader.put(Metadata.Key.of("Authentication", Metadata.ASCII_STRING_MARSHALLER), "tenant1");
+        return MetadataUtils.attachHeaders(stub, authHeader);
     }
 }

@@ -37,18 +37,19 @@ public class EndpointInventory extends RegisterSource {
     @Setter @Getter private String name = Const.EMPTY_STRING;
     @Setter @Getter private int detectPoint;
 
-    public static String buildId(int serviceId, String endpointName) {
-        return serviceId + Const.ID_SPLIT + endpointName;
+    public static String buildId(int serviceId, String endpointName, int detectPoint) {
+        return serviceId + Const.ID_SPLIT + endpointName + Const.ID_SPLIT + detectPoint;
     }
 
-    public String id() {
-        return buildId(serviceId, name);
+    @Override public String id() {
+        return buildId(serviceId, name, detectPoint);
     }
 
     @Override public int hashCode() {
         int result = 17;
         result = 31 * result + serviceId;
         result = 31 * result + name.hashCode();
+        result = 31 * result + detectPoint;
         return result;
     }
 
@@ -64,6 +65,8 @@ public class EndpointInventory extends RegisterSource {
         if (serviceId != source.getServiceId())
             return false;
         if (!name.equals(source.getName()))
+            return false;
+        if (detectPoint != source.getDetectPoint())
             return false;
 
         return true;

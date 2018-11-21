@@ -3,7 +3,7 @@ package org.apache.skywalking.apm.collector.performance.register;
 import io.grpc.ManagedChannel;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.apache.skywalking.apm.collector.performance.Const;
+import org.apache.skywalking.apm.collector.performance.*;
 import org.apache.skywalking.apm.network.proto.*;
 import org.slf4j.*;
 
@@ -18,7 +18,7 @@ public class ServiceInstancesRegister {
     private final InstanceDiscoveryServiceGrpc.InstanceDiscoveryServiceBlockingStub instanceDiscoveryServiceBlockingStub;
 
     public ServiceInstancesRegister(ManagedChannel channel) {
-        this.instanceDiscoveryServiceBlockingStub = InstanceDiscoveryServiceGrpc.newBlockingStub(channel);
+        this.instanceDiscoveryServiceBlockingStub = PerformanceBoot.attachHeaders(InstanceDiscoveryServiceGrpc.newBlockingStub(channel));
     }
 
     public void register(ExecutorService threadPool, RegisterInventoryStorage.Service[] services, int number) {

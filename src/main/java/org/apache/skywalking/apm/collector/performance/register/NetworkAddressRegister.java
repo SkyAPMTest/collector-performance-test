@@ -3,6 +3,7 @@ package org.apache.skywalking.apm.collector.performance.register;
 import io.grpc.ManagedChannel;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.apache.skywalking.apm.collector.performance.PerformanceBoot;
 import org.apache.skywalking.apm.collector.performance.client.*;
 import org.apache.skywalking.apm.collector.performance.inventory.*;
 import org.apache.skywalking.apm.network.proto.*;
@@ -21,7 +22,7 @@ public class NetworkAddressRegister {
     private final ElasticSearchClient client;
 
     public NetworkAddressRegister(ManagedChannel channel, ElasticSearchClient client) {
-        this.networkAddressRegisterServiceStub = NetworkAddressRegisterServiceGrpc.newBlockingStub(channel);
+        this.networkAddressRegisterServiceStub = PerformanceBoot.attachHeaders(NetworkAddressRegisterServiceGrpc.newBlockingStub(channel));
         this.client = client;
     }
 

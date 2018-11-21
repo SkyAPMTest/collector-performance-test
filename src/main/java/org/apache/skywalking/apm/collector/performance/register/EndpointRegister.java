@@ -3,7 +3,7 @@ package org.apache.skywalking.apm.collector.performance.register;
 import io.grpc.ManagedChannel;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.apache.skywalking.apm.collector.performance.Const;
+import org.apache.skywalking.apm.collector.performance.*;
 import org.apache.skywalking.apm.collector.performance.client.*;
 import org.apache.skywalking.apm.collector.performance.inventory.EndpointInventory;
 import org.apache.skywalking.apm.network.proto.*;
@@ -26,7 +26,7 @@ public class EndpointRegister {
     }
 
     EndpointRegister(ManagedChannel channel, ElasticSearchClient client) {
-        this.serviceNameDiscoveryServiceBlockingStub = ServiceNameDiscoveryServiceGrpc.newBlockingStub(channel);
+        this.serviceNameDiscoveryServiceBlockingStub = PerformanceBoot.attachHeaders(ServiceNameDiscoveryServiceGrpc.newBlockingStub(channel));
         this.client = client;
     }
 
